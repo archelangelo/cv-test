@@ -9,6 +9,7 @@ hei_b = img_b.shape[0]
 img_f = cv2.imread('cat.jpg')
 wid_f = img_f.shape[1]
 hei_f = img_f.shape[0]
+img_mask = np.ones(img_f.shape[:2], dtype=np.uint8) * 255
 
 # x0 y0 move image center to (0,0)
 x0 = -wid_f/2.
@@ -22,11 +23,11 @@ def image_gen(idx:int):
     ang_z = (np.random.random_sample() - 0.5) * 10.
     ang_y = (np.random.random_sample() - 0.5) * 60.
     ang_x = (np.random.random_sample() - 0.5) * 30.
-    rot_m = R.from_euler('y', ang_y, degrees=True).as_matrix()
+    rot_m = R.from_euler('zyx', [ang_z, ang_y, ang_x], degrees=True).as_matrix()
     # Move the display in the room (Translation)
     del_x = (np.random.random_sample() - 0.5) * 500.
     del_y = (np.random.random_sample() - 0.5) * 500.
-    del_z = np.random.random_sample() * (-500.) - 2750.
+    del_z = np.random.random_sample() * (-1500.) - 3000.
     # Set the viewbox constants (http://www.songho.ca/opengl/gl_projectionmatrix.html)
     t = 10.
     r = 10.
@@ -68,7 +69,11 @@ def image_gen(idx:int):
 
     # Warp the forground image
     img_w = cv2.warpPerspective(img_f, tran_m, img_b.shape[1::-1])
-    cv2.imshow('Warpped image {}'.format(idx), img_w)
+    img_mask_w = cv2.warpPerspective(img_mask, tran_m, img_b.shape[1::-1])
+    foreground = cv2.bitwise_and(img_w, img_w, mask=img_mask_w)
+    background = cv2.bitwise_and(img_b, img_b, mask=cv2.bitwise_not(img_mask_w))
+    dst = cv2.add(foreground, background)
+    cv2.imshow('Warpped image {}'.format(idx), dst)
 
 # Set number of generated images
 n_images = 10
