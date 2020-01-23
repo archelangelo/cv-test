@@ -3,19 +3,35 @@ import cv2
 from scipy.spatial.transform import Rotation as R
 
 # Read images
-img_b = cv2.imread('airplane.jpg')
+img_b = cv2.imread('room.jpg')
 wid_b = img_b.shape[1]
 hei_b = img_b.shape[0]
 img_f = cv2.imread('cat.jpg')
 wid_f = img_f.shape[1]
 hei_f = img_f.shape[0]
-img_mask = np.ones(img_f.shape[:2], dtype=np.uint8) * 255
+img_mask = np.ones(img_f.shape[:2]) * 255
 
 # x0 y0 move image center to (0,0)
 x0 = -wid_f/2.
 y0 = -hei_f/2.
 x1 = wid_b/2.
 y1 = hei_b/2.
+
+def draw_circle(img, tran_m):
+    c0 = np.array([[
+        [0, 0],
+        [wid_f, 0],
+        [wid_f, hei_f],
+        [0, hei_f],
+    ]], dtype=np.float32)
+    ct = cv2.perspectiveTransform(c0, tran_m).reshape(-1, 2).astype(np.int)
+    radius = 8
+    color = (255, 0, 0)
+    img = cv2.circle(img, (ct[0, 0], ct[0, 1]), radius, color, -1)
+    img = cv2.circle(img, (ct[1, 0], ct[1, 1]), radius, color, -1)
+    img = cv2.circle(img, (ct[2, 0], ct[2, 1]), radius, color, -1)
+    img = cv2.circle(img, (ct[3, 0], ct[3, 1]), radius, color, -1)
+    return img
 
 def image_gen(idx:int):
     # Prepare the transformation matrix
@@ -68,15 +84,25 @@ def image_gen(idx:int):
 
 
     # Warp the forground image
-    img_w = cv2.warpPerspective(img_f, tran_m, img_b.shape[1::-1])
-    img_mask_w = cv2.warpPerspective(img_mask, tran_m, img_b.shape[1::-1])
-    foreground = cv2.bitwise_and(img_w, img_w, mask=img_mask_w)
-    background = cv2.bitwise_and(img_b, img_b, mask=cv2.bitwise_not(img_mask_w))
+    interpo_flag = cv2.INTER_LINEAR
+    img_w = cv2.warpPerspective(img_f, tran_m, img_b.shape[1::-1], flags=interpo_flag)
+    img_mask_w = cv2.warpPerspective(img_mask, tran_m, img_b.shape[1::-1], flags=interpo_flag)[:, :, np.newaxis]
+    print("mask max = {}".format(np.amax(img_mask_w)))
+    print("mask min = {}".format(np.amin(img_mask_w)))
+    print("img_w datatype is {}".format(img_w.dtype))
+    # foreground = cv2.bitwise_and(img_w, img_w, mask=img_mask_w)
+    # background = cv2.bitwise_and(img_b, img_b, mask=cv2.bitwise_not(img_mask_w))
+    foreground = np.uint8(img_w * (img_mask_w / 255.))
+    background = np.uint8(img_b * (1. - img_mask_w / 255.))
     dst = cv2.add(foreground, background)
+    # dst = cv2.GaussianBlur(dst, (0, 0), 2)
+    dst = draw_circle(dst, tran_m)
     cv2.imshow('Warpped image {}'.format(idx), dst)
+    # cv2.imwrite('image_{}.png'.format(idx), dst)
+    # cv2.imwrite('foreground_{}.png'.format(idx), foreground)
 
 # Set number of generated images
-n_images = 10
+n_images = 4
 for i in range(n_images):
     image_gen(i)
 
